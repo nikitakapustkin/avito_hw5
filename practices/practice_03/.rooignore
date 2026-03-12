@@ -1,0 +1,24 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Dependencies
+poetry.lock
+
+# Env & secrets
+.env
+
+# Reference implementation (не трогать, только для ознакомления)
+docs/weather_service/
+
+# IDE
+.idea/
+.vscode/
+
+# Docker
+*.log
