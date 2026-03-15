@@ -1,0 +1,107 @@
+{
+	"mcpServers": {
+		"context7": {
+			"command": "npx",
+			"args": [
+				"-y",
+				"@upstash/context7-mcp@latest"
+			],
+			"alwaysAllow": [
+				"resolve-library-id",
+				"query-docs"
+			]
+		},
+		"sequential-thinking": {
+			"command": "npx",
+			"args": [
+				"-y",
+				"@modelcontextprotocol/server-sequential-thinking"
+			],
+			"alwaysAllow": [
+				"sequentialthinking"
+			]
+		},
+		"ticktick": {
+			"command": "npx",
+			"args": [
+				"-y",
+				"@ticktick/mcp-server"
+			],
+			"env": {
+				"API_TOKEN": "tp_e84dff5d9d364a60a7280774e548c339",
+				"API_DOMAIN": "api.ticktick.com"
+			},
+			"alwaysAllow": [
+				"get_projects",
+				"get_tasks",
+				"create_task",
+				"update_task",
+				"complete_task",
+				"add_task",
+				"get_todo_tasks"
+			]
+		},
+		"github": {
+			"command": "npx",
+			"args": [
+				"-y",
+				"@modelcontextprotocol/server-github"
+			],
+			"env": {
+				"GITHUB_PERSONAL_ACCESS_TOKEN": "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"
+			},
+			"alwaysAllow": [
+				"list_commits",
+				"get_file_contents",
+				"create_issue",
+				"list_pull_requests",
+				"search_repositories"
+			]
+		},
+		"notion": {
+			"command": "python3",
+			"args": [
+				"mcp_servers/notion/server.py"
+			],
+			"env": {
+				"NOTION_TOKEN": "ntn_d68651770763eyqYd2HBOUSJ9CBWTPNRJPV5vyujRkweD9"
+			},
+			"alwaysAllow": [
+				"search_pages",
+				"get_page",
+				"create_page",
+				"append_text"
+			]
+		},
+		"memory": {
+			"command": "npx",
+			"args": [
+				"-y",
+				"@modelcontextprotocol/server-memory"
+			],
+			"alwaysAllow": [
+				"create_entities",
+				"create_relations",
+				"add_observations",
+				"search_nodes",
+				"read_graph",
+				"open_nodes"
+			]
+		},
+		"plantuml": {
+			"command": "npx",
+			"args": [
+				"-y",
+				"plantuml-mcp-server"
+			],
+			"env": {
+				"PLANTUML_SERVER_URL": "https://www.plantuml.com/plantuml"
+			},
+			"alwaysAllow": [
+				"generate_plantuml_diagram",
+				"encode_plantuml",
+				"decode_plantuml"
+			]
+		}
+	}
+}
