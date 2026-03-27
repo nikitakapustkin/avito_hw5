@@ -377,33 +377,33 @@ async def subscribe(
             created_at=subscription.created_at,
         )
     
-    except CityNotFoundError:
+    except CityNotFoundError as err:
         logger.info(f"City not found in subscription request: {normalized_city}")
         raise HTTPException(
             status_code=404,
             detail=f"City '{normalized_city}' not found",
-        )
-    
-    except RateLimitedError:
+        ) from err
+
+    except RateLimitedError as err:
         logger.warning(f"Rate limited by OpenWeatherMap: {normalized_city}")
         raise HTTPException(
             status_code=503,
             detail="Service temporarily unavailable (rate limited)",
-        )
-    
-    except ProviderError:
+        ) from err
+
+    except ProviderError as err:
         logger.error(f"OpenWeatherMap server error: {normalized_city}")
         raise HTTPException(
             status_code=502,
             detail="Weather provider error",
-        )
-    
-    except ProviderTimeoutError:
+        ) from err
+
+    except ProviderTimeoutError as err:
         logger.error(f"Timeout verifying city for subscription: {normalized_city}")
         raise HTTPException(
             status_code=504,
             detail="Request timeout",
-        )
+        ) from err
     
     except HTTPException:
         # Re-raise HTTP exceptions (already handled above)
