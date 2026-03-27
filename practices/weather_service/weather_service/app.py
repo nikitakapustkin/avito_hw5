@@ -346,8 +346,7 @@ async def subscribe(
                 and sub.city_normalized.lower() == city_normalized_lower
             ):
                 logger.warning(
-                    f"Subscription already exists for email: {email_lower}, "
-                    f"city_normalized: {city_normalized_lower}"
+                    f"Subscription already exists for city_normalized: {city_normalized_lower}"
                 )
                 raise HTTPException(
                     status_code=409,
@@ -366,7 +365,7 @@ async def subscribe(
         AppState.subscriptions[subscription.id] = subscription
         logger.info(
             f"Subscription created: id={subscription.id}, city={normalized_city}, "
-            f"city_normalized={city_normalized_lower}, email={email_lower}"
+            f"city_normalized={city_normalized_lower}"
         )
         
         # Return subscription response
@@ -437,8 +436,9 @@ async def subscribe(
     },
 )
 async def delete_subscribe(
-    id: str = Path(
+    subscription_id: str = Path(
         ...,
+        alias="id",
         description="Subscription unique identifier",
         examples=["550e8400-e29b-41d4-a716-446655440000"],
     ),
@@ -463,15 +463,15 @@ async def delete_subscribe(
     """
     
     # Step 1: Check if subscription exists
-    if id not in AppState.subscriptions:
-        logger.warning(f"Subscription not found for deletion: id={id}")
+    if subscription_id not in AppState.subscriptions:
+        logger.warning(f"Subscription not found for deletion: id={subscription_id}")
         raise HTTPException(
             status_code=404,
-            detail=f"Subscription with id '{id}' not found",
+            detail=f"Subscription with id '{subscription_id}' not found",
         )
-    
+
     # Step 2: Delete subscription
-    subscription = AppState.subscriptions.pop(id)
+    subscription = AppState.subscriptions.pop(subscription_id)
     logger.info(
         f"Subscription deleted: id={id}, city={subscription.city}, "
         f"email={subscription.email}"

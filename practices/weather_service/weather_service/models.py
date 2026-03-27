@@ -1,6 +1,6 @@
 """Pydantic models for Weather Service API responses."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Literal
 from uuid import uuid4
 from pydantic import BaseModel, Field, field_validator, EmailStr
@@ -156,14 +156,14 @@ class Subscription(BaseModel):
     city_normalized: str  # Lowercase normalized for uniqueness check
     email: str  # Stored as-is from request (will be lowercased for comparison)
     channel: Literal["email"]
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class WeatherHistoryEntry(WeatherResponse):
     """Single weather history record extending WeatherResponse with a timestamp."""
 
     requested_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=lambda: datetime.now(timezone.utc),
         description="UTC timestamp of when the weather was requested",
         examples=["2026-03-27T10:00:00"],
     )
