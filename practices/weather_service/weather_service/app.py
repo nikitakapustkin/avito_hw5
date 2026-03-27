@@ -72,13 +72,17 @@ async def lifespan(app: FastAPI):
         # Get configuration from environment
         redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
         api_key = os.getenv("OPENWEATHERMAP_API_KEY")
-        
+
         if not api_key:
             logger.error("OPENWEATHERMAP_API_KEY environment variable not set")
             raise RuntimeError("OPENWEATHERMAP_API_KEY not configured")
-        
+
         # Initialize Redis
         try:
+            # Reset AppState fields before attempting connection
+            AppState.redis_client = None
+            AppState.cache_service = None
+
             redis_client = Redis.from_url(redis_url, decode_responses=True)
             redis_client.ping()
             logger.info("Redis connection established")
@@ -86,9 +90,10 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"Failed to connect to Redis: {e}. Cache will be unavailable.")
             AppState.redis_client = None
-        
-        # Initialize cache service
-        if AppState.redis_client:
+            AppState.cache_service = None
+
+        # Initialize cache service only when redis_client is valid
+        if AppState.redis_client is not None:
             AppState.cache_service = CacheService(AppState.redis_client)
         
         # Initialize OpenWeatherMap client
@@ -514,6 +519,14 @@ async def get_weather_history(
     Returns:
         list[WeatherHistoryEntry] — from oldest to newest, max HISTORY_MAX_SIZE entries
     """
+    # Validate city parameter before normalization
+    if city is None or city.strip() == "":
+        logger.warning("Empty city parameter in history request")
+        raise HTTPException(
+            status_code=422,
+            detail="City cannot be empty",
+        )
+
     normalized_city = city.strip().lower()
     return AppState.weather_history.get(normalized_city, [])
 
