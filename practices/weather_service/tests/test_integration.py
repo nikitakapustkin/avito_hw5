@@ -584,3 +584,105 @@ class TestWeatherHistoryEndpoint:
             response = client.get(f"/weather/{city}/history")
             assert response.status_code == 200
             assert response.json() == []
+
+
+class TestHistoryEndpointE2E:
+    """
+    End-to-end tests for the history feature:
+    call GET /weather/{city} first, then verify GET /weather/{city}/history.
+
+    These tests exercise both endpoints together — no monkeypatching of AppState.weather_history.
+    """
+
+    @pytest.fixture(autouse=True)
+    def reset_history(self, monkeypatch):
+        """Isolate each test — reset history before each test."""
+        monkeypatch.setattr("weather_service.app.AppState.weather_history", {})
+
+    @pytest.mark.asyncio
+    async def test_history_empty_before_any_request(self, client):
+        """
+        История пуста при старте:
+        GET /weather/{city}/history returns [] before any weather request is made.
+        """
+        response = client.get("/weather/moscow/history")
+
+        assert response.status_code == 200
+        assert response.json() == []
+
+    @pytest.mark.asyncio
+    async def test_history_populated_after_weather_request(
+        self, client, setup_app_state
+    ):
+        """
+        История заполняется после GET /weather/{city}:
+        After one successful GET /weather/moscow, /weather/moscow/history returns 1 entry
+        with all required fields (city, temperature, description, humidity, wind_speed, requested_at).
+        """
+        mock_redis = setup_app_state["redis"]
+        mock_weather_client = setup_app_state["weather_client"]
+
+        weather_response = WeatherResponse(
+            city="Moscow",
+            temperature=15.5,
+            description="Overcast clouds",
+            humidity=72,
+            wind_speed=3.5,
+        )
+        mock_redis.get.return_value = None
+        mock_weather_client.get_weather.return_value = weather_response
+        mock_redis.setex.return_value = True
+
+        # Step 1: make a weather request
+        weather_resp = client.get("/weather/Moscow")
+        assert weather_resp.status_code == 200
+
+        # Step 2: verify history endpoint reflects it
+        history_resp = client.get("/weather/Moscow/history")
+        assert history_resp.status_code == 200
+
+        data = history_resp.json()
+        assert len(data) == 1
+        entry = data[0]
+        assert entry["city"] == "Moscow"
+        assert entry["temperature"] == 15.5
+        assert entry["description"] == "Overcast clouds"
+        assert entry["humidity"] == 72
+        assert entry["wind_speed"] == 3.5
+        assert "requested_at" in entry
+
+    @pytest.mark.asyncio
+    async def test_history_limited_to_ten_entries(self, client, setup_app_state):
+        """
+        История ограничена последними 10 записями:
+        After 11 successful GET /weather/berlin requests, /weather/berlin/history
+        returns exactly 10 entries (oldest is dropped, newest is last).
+        """
+        mock_redis = setup_app_state["redis"]
+        mock_weather_client = setup_app_state["weather_client"]
+        mock_redis.setex.return_value = True
+
+        # Make 11 requests with distinct temperatures (1.0 .. 11.0)
+        for i in range(1, 12):
+            mock_redis.get.return_value = None
+            mock_weather_client.get_weather.return_value = WeatherResponse(
+                city="Berlin",
+                temperature=float(i),
+                description="Clear",
+                humidity=50,
+                wind_speed=1.0,
+            )
+            resp = client.get("/weather/Berlin")
+            assert resp.status_code == 200
+
+        # Verify via the history endpoint
+        history_resp = client.get("/weather/Berlin/history")
+        assert history_resp.status_code == 200
+
+        data = history_resp.json()
+        assert len(data) == 10
+
+        # Oldest entry (temperature=1.0) must be dropped; newest (temperature=11.0) is last
+        temperatures = [entry["temperature"] for entry in data]
+        assert 1.0 not in temperatures
+        assert temperatures[-1] == 11.0
