@@ -481,6 +481,43 @@ async def delete_subscribe(
     return None
 
 
+@app.get(
+    "/weather/{city}/history",
+    response_model=list[WeatherHistoryEntry],
+    status_code=200,
+    tags=["Weather"],
+    responses={
+        200: {"description": "Weather history for city (empty list if no history)"},
+        422: {"description": "Invalid city parameter"},
+    },
+)
+async def get_weather_history(
+    city: str = Path(
+        ...,
+        description="City name",
+        min_length=1,
+        max_length=100,
+        examples=["Moscow"],
+    ),
+) -> list[WeatherHistoryEntry]:
+    """
+    Return in-memory history of weather requests for a city (last HISTORY_MAX_SIZE entries).
+
+    **Behavior:**
+    - Returns [] if the city has never been queried (per D-07)
+    - City is normalized (strip + lowercase) for lookup (per D-08)
+    - Does not call OpenWeatherMap or Redis
+
+    Args:
+        city: City name
+
+    Returns:
+        list[WeatherHistoryEntry] — from oldest to newest, max HISTORY_MAX_SIZE entries
+    """
+    normalized_city = city.strip().lower()
+    return AppState.weather_history.get(normalized_city, [])
+
+
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request, exc: HTTPException):
     """Custom HTTP exception handler to ensure consistent error responses."""

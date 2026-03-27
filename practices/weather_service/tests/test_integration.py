@@ -504,3 +504,83 @@ class TestWeatherHistory:
         from weather_service.app import AppState
         assert "london" in AppState.weather_history
         assert "LONDON" not in AppState.weather_history
+
+
+class TestWeatherHistoryEndpoint:
+    """Tests for GET /weather/{city}/history endpoint."""
+
+    @pytest.fixture(autouse=True)
+    def reset_history(self, monkeypatch):
+        """Reset AppState.weather_history before each test to prevent contamination."""
+        monkeypatch.setattr("weather_service.app.AppState.weather_history", {})
+
+    @pytest.mark.asyncio
+    async def test_empty_list_for_never_queried_city(self, client):
+        """GET /weather/{city}/history returns 200 with [] for a city never queried."""
+        response = client.get("/weather/neverqueried/history")
+        assert response.status_code == 200
+        assert response.json() == []
+
+    @pytest.mark.asyncio
+    async def test_case_insensitive_normalization(self, client, monkeypatch):
+        """GET /weather/Moscow/history and GET /weather/moscow/history resolve to same history."""
+        from weather_service.models import WeatherHistoryEntry
+
+        entry = WeatherHistoryEntry(
+            city="Moscow",
+            temperature=10.0,
+            description="Clear",
+            humidity=60,
+            wind_speed=2.0,
+        )
+        monkeypatch.setattr(
+            "weather_service.app.AppState.weather_history",
+            {"moscow": [entry]},
+        )
+
+        response_upper = client.get("/weather/Moscow/history")
+        response_lower = client.get("/weather/moscow/history")
+
+        assert response_upper.status_code == 200
+        assert response_lower.status_code == 200
+        assert len(response_upper.json()) == 1
+        assert len(response_lower.json()) == 1
+        assert response_upper.json()[0]["city"] == "Moscow"
+        assert response_lower.json()[0]["city"] == "Moscow"
+
+    @pytest.mark.asyncio
+    async def test_returns_correct_entries_with_all_fields(self, client, monkeypatch):
+        """History entries include all required fields: city, temperature, description, humidity, wind_speed, requested_at."""
+        from weather_service.models import WeatherHistoryEntry
+
+        entry = WeatherHistoryEntry(
+            city="Moscow",
+            temperature=15.5,
+            description="Overcast clouds",
+            humidity=72,
+            wind_speed=3.5,
+        )
+        monkeypatch.setattr(
+            "weather_service.app.AppState.weather_history",
+            {"moscow": [entry]},
+        )
+
+        response = client.get("/weather/moscow/history")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["city"] == "Moscow"
+        assert data[0]["temperature"] == 15.5
+        assert data[0]["description"] == "Overcast clouds"
+        assert data[0]["humidity"] == 72
+        assert data[0]["wind_speed"] == 3.5
+        assert "requested_at" in data[0]
+
+    @pytest.mark.asyncio
+    async def test_no_404_for_unknown_city_always_200(self, client):
+        """GET /weather/{city}/history never returns 404 — always 200 even for unknown cities."""
+        for city in ["unknowncity", "nonexistent", "xyz123"]:
+            response = client.get(f"/weather/{city}/history")
+            assert response.status_code == 200
+            assert response.json() == []
