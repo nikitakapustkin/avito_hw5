@@ -3,6 +3,7 @@
 import logging
 import os
 from contextlib import asynccontextmanager
+from typing import ClassVar
 from fastapi import FastAPI, HTTPException, Path, Body
 from fastapi.responses import JSONResponse
 from redis import Redis
@@ -28,11 +29,11 @@ logger = logging.getLogger(__name__)
 class AppState:
     """Application state container."""
 
-    cache_service: CacheService | None = None
-    weather_client: OpenWeatherMapClient | None = None
-    redis_client: Redis | None = None
-    subscriptions: dict[str, Subscription] = {}
-    weather_history: dict[str, list[WeatherHistoryEntry]] = {}
+    cache_service: ClassVar[CacheService | None] = None
+    weather_client: ClassVar[OpenWeatherMapClient | None] = None
+    redis_client: ClassVar[Redis | None] = None
+    subscriptions: ClassVar[dict[str, Subscription]] = {}
+    weather_history: ClassVar[dict[str, list[WeatherHistoryEntry]]] = {}
 
 
 def _record_history(normalized_city: str, weather: WeatherResponse) -> None:
@@ -224,40 +225,40 @@ async def get_weather(
         _record_history(normalized_city, weather)
         return weather
     
-    except CityNotFoundError:
+    except CityNotFoundError as err:
         logger.info(f"City not found: {city}")
         raise HTTPException(
             status_code=404,
             detail=f"City '{city}' not found",
-        )
-    
-    except RateLimitedError:
+        ) from err
+
+    except RateLimitedError as err:
         logger.warning(f"Rate limited by OpenWeatherMap for city: {city}")
         raise HTTPException(
             status_code=503,
             detail="Service temporarily unavailable (rate limited)",
-        )
-    
-    except ProviderError:
+        ) from err
+
+    except ProviderError as err:
         logger.error(f"OpenWeatherMap server error for city: {city}")
         raise HTTPException(
             status_code=502,
             detail="Weather provider error",
-        )
-    
-    except ProviderTimeoutError:
+        ) from err
+
+    except ProviderTimeoutError as err:
         logger.error(f"Timeout fetching weather for city: {city}")
         raise HTTPException(
             status_code=504,
             detail="Request timeout",
-        )
-    
-    except OpenWeatherMapError as e:
-        logger.error(f"OpenWeatherMap error for city: {city}. Error: {e}")
+        ) from err
+
+    except OpenWeatherMapError as err:
+        logger.error(f"OpenWeatherMap error for city: {city}. Error: {err}")
         raise HTTPException(
             status_code=503,
             detail="Weather service error",
-        )
+        ) from err
     
     except HTTPException:
         # Re-raise HTTP exceptions (already handled above)
@@ -473,8 +474,7 @@ async def delete_subscribe(
     # Step 2: Delete subscription
     subscription = AppState.subscriptions.pop(subscription_id)
     logger.info(
-        f"Subscription deleted: id={id}, city={subscription.city}, "
-        f"email={subscription.email}"
+        f"Subscription deleted: id={subscription_id}, city={subscription.city}"
     )
     
     # Step 3: Return 204 No Content
